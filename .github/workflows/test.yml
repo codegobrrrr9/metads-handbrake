@@ -1,0 +1,23 @@
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - name: the brake works on a fresh checkout
+        shell: bash
+        run: |
+          node skills/handbrake/scripts/handbrake.js explain mcp__meta-ads__ads_activate_entity '{"entity_id":"1"}' | grep -q "would: ask"
+          node skills/handbrake/scripts/handbrake.js explain mcp__meta-ads__ads_update_entity '{"entity_id":"1","status":"PAUSED"}' | grep -q "would: allow"
+          node skills/handbrake/scripts/handbrake.js explain Bash '{"command":"handbrake approve hb-1"}' | grep -q "would: deny"

@@ -1,0 +1,6 @@
+{
+  "name": "handbrake",
+  "version": "0.1.0",
+  "description": "The agent can drive your Meta ads. Spend does not move until you release the brake.",
+  "contextFileName": "AGENTS.md"
+}

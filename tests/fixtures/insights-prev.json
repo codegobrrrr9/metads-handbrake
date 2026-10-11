@@ -1,0 +1,5 @@
+[
+  { "name": "Hero video 01", "level": "ad", "spend": 600.00, "impressions": 60000, "reach": 30000, "results": 40, "publisher_platform": "facebook", "platform_position": "feed" },
+  { "name": "Carousel 02", "level": "ad", "spend": 100.00, "impressions": 10000, "reach": 9000, "results": 6, "publisher_platform": "instagram", "platform_position": "feed" },
+  { "name": "Static 03", "level": "ad", "spend": 100.00, "impressions": 10000, "reach": 9000, "results": 5, "publisher_platform": "facebook", "platform_position": "feed" }
+]

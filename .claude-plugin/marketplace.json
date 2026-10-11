@@ -1,0 +1,18 @@
+{
+  "name": "handbrake",
+  "owner": { "name": "codegobrrrr9", "url": "https://github.com/codegobrrrr9" },
+  "metadata": { "description": "Spend does not move until you release the brake.", "version": "0.1.0" },
+  "plugins": [
+    {
+      "name": "handbrake",
+      "source": "./",
+      "description": "Approval-gated Meta ads agent: reads and pauses pass, activations and budgets stop at you, everything in a ledger.",
+      "version": "0.1.0",
+      "author": { "name": "codegobrrrr9" },
+      "homepage": "https://github.com/codegobrrrr9/handbrake",
+      "license": "MIT",
+      "keywords": ["meta-ads", "mcp", "approval", "hooks"],
+      "category": "productivity"
+    }
+  ]
+}

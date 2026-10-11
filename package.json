@@ -1,0 +1,14 @@
+{
+  "name": "handbrake-skill",
+  "version": "0.1.0",
+  "description": "The agent can drive your Meta ads. Spend does not move until you release the brake.",
+  "type": "module",
+  "bin": { "handbrake": "./skills/handbrake/scripts/handbrake.js" },
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "repository": { "type": "git", "url": "https://github.com/codegobrrrr9/handbrake" },
+  "keywords": ["claude-skills", "agent-skills", "claude-code", "mcp", "meta-ads", "facebook-ads", "instagram-ads", "advantage-plus", "human-in-the-loop", "approval", "hooks", "audit"],
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}

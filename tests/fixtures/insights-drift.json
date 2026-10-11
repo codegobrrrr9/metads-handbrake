@@ -1,0 +1,7 @@
+[
+  { "name": "Hero video 01", "level": "ad", "spend": 700.00, "impressions": 180000, "reach": 40000, "results": 32, "publisher_platform": "facebook", "platform_position": "feed", "learning_stage": "SUCCESS", "advantage_audience": true },
+  { "name": "Carousel 02", "level": "ad", "spend": 90.00, "impressions": 30000, "reach": 25000, "results": 4, "publisher_platform": "instagram", "platform_position": "feed" },
+  { "name": "Static 03", "level": "ad", "spend": 70.00, "impressions": 25000, "reach": 22000, "results": 0, "publisher_platform": "facebook", "platform_position": "feed" },
+  { "name": "AN placement bucket", "level": "ad", "spend": 300.00, "impressions": 900000, "reach": 600000, "results": 20, "publisher_platform": "audience_network", "platform_position": "rewarded_video" },
+  { "name": "Retarget 7d", "level": "adset", "spend": 0, "impressions": 0, "reach": 0, "results": 0, "learning_stage": "LEARNING_LIMITED" }
+]
