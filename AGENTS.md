@@ -14,7 +14,7 @@ of the session. Do not explain what handbrake is unless asked.
 
 | Agent | Do this |
 |-------|---------|
-| Claude Code | Run `/plugin marketplace add codegobrrrr9/handbrake` then `/plugin install handbrake@handbrake`. The plugin ships three hooks: Meta ads reads pass, pauses pass, creates are logged, activations and budget changes stop at a permission prompt (or need a two-key token), and a final message that says "live" without a successful write in the ledger is sent back. If plugins are unavailable, copy `<repo>/skills/handbrake/` to `~/.claude/skills/handbrake/` and add the hooks block below to `~/.claude/settings.json`. |
+| Claude Code | Run `/plugin marketplace add codegobrrrr9/handbrake` then `/plugin install handbrake@handbrake`. The plugin ships four hooks: Meta ads reads pass, pauses pass, creates are logged, activations and budget changes stop at a permission prompt (or need a two-key token), and a final message that says "live" without a successful write in the ledger is sent back. If plugins are unavailable, copy `<repo>/skills/handbrake/` to `~/.claude/skills/handbrake/` and add the hooks block below to `~/.claude/settings.json`. |
 | Codex | Copy `<repo>/skills/handbrake/` to `~/.codex/skills/handbrake/`, or run `npx skills add codegobrrrr9/handbrake`. Append the **Rules** below to the project's `AGENTS.md`. Before any write, run `node <path>/handbrake.js explain <tool> '<json>'` and show the human the summary. |
 | Cursor | Copy `<repo>/.cursor/rules/handbrake.mdc` to `.cursor/rules/handbrake.mdc` and `<repo>/skills/handbrake/scripts/handbrake.js` to `scripts/handbrake.js` in the project. |
 | Gemini CLI | Run `gemini extensions install https://github.com/codegobrrrr9/handbrake`. |
@@ -38,6 +38,7 @@ Hooks block for a non-plugin Claude Code install (`~/.claude/settings.json`), wi
   "hooks": {
     "PreToolUse": [{ "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__.*", "hooks": [{ "type": "command", "command": "node \"<repo>/hooks/pre-tool-use.js\"", "timeout": 10 }] }],
     "PostToolUse": [{ "matcher": "Bash|mcp__.*", "hooks": [{ "type": "command", "command": "node \"<repo>/hooks/post-tool-use.js\"", "timeout": 10 }] }],
+    "PostToolUseFailure": [{ "matcher": "Bash|mcp__.*", "hooks": [{ "type": "command", "command": "node \"<repo>/hooks/post-tool-use.js\"", "timeout": 10 }] }],
     "Stop": [{ "hooks": [{ "type": "command", "command": "node \"<repo>/hooks/stop.js\"", "timeout": 15 }] }]
   }
 }
@@ -51,7 +52,7 @@ You can drive. The brake stays on until the human releases it.
 
 1. **Reads are free.** Insights, entities, benchmarks, catalogs: call them when they help.
 2. **Pausing is always allowed.** Anything that stops or reduces spend goes through at once. Bleeding? Pause first, explain second.
-3. **Create freely, PAUSED.** Meta creates everything paused. Build the structure, then propose activation. Never pass `status: ACTIVE` on a create.
+3. **Create freely, PAUSED.** Meta creates community-server objects paused and official-server objects as unpublished drafts. Build the structure, then propose activation. Never pass `status: ACTIVE` on a create.
 4. **Activation and budget changes stop at the human.** Say in one line what the change does to spend (entity, direction, amount per day, why) before the call. In `twokey` mode the human runs `handbrake approve <id>` in *their* terminal; then you call the tool again with exactly the same arguments.
 5. **Caps are the human's.** A denial for `max_daily_budget`, `allowed_accounts` or `block_activate` means propose inside the cap or tell the human how to change the policy. Never split one change into several to get under a cap.
 6. **Never touch `.handbrake/`** by any tool or command.

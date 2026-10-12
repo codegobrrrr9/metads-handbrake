@@ -27,7 +27,8 @@ export function handle(input) {
   } else return null;
   const d = lib.decide(cls, policy, cwd);
   if (d.decision === 'pass') return null;
-  lib.appendLedger(cwd, { session: input.session_id || '', id: cls.id, tool, kind: cls.kind, summary: cls.summary, decision: d.decision, reason: d.reason.split('\n')[0], account: cls.account || null, budgets: cls.budgets || {} });
+  const argsStr = JSON.stringify(args); // kept so a denied or mismatched call can be diagnosed later
+  lib.appendLedger(cwd, { session: input.session_id || '', id: cls.id, tool, kind: cls.kind, eid: cls.eid || null, summary: cls.summary, decision: d.decision, reason: d.reason.split('\n')[0], account: cls.account || null, budgets: cls.budgets || {}, args: argsStr.length > 1500 ? argsStr.slice(0, 1500) + '…' : argsStr });
   return {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',

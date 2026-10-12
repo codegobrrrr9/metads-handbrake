@@ -22,6 +22,101 @@ test('bareTool strips the mcp prefix including servers with underscores', () => 
   assert.equal(bareTool('Bash'), 'Bash');
 });
 
+test('approval id binds to the meaning of the change, not the argument layout', () => {
+  const a = classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_1', entity_id: '120', entity_type: 'ad_set', publish_as_active: true }).id;
+  const b = classify('mcp__pipeboard__ads_activate_entity', { entity_type: 'AD_SET', entity_id: 120, ad_account_id: 'act_1', publish_as_active: 'true', note: null }).id;
+  const c = classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_1', entity_id: '121', entity_type: 'ad_set' }).id;
+  const d = classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_2', entity_id: '120', entity_type: 'ad_set' }).id;
+  assert.equal(a, b, 'same entity, same account, same kind: same id');
+  assert.notEqual(a, c, 'different entity');
+  assert.notEqual(a, d, 'different account');
+  const e = classify('mcp__meta__ads_update_entity', { entity_id: '1', daily_budget: 5000 }).id;
+  const f = classify('mcp__meta__ads_update_entity', { entity_id: '1', updates: { daily_budget: '5000' } }).id;
+  const g = classify('mcp__meta__ads_update_entity', { entity_id: '1', daily_budget: 5001 }).id;
+  assert.equal(e, f, 'budget found at any depth, number or string');
+  assert.notEqual(e, g, 'different amount is a different change');
+  const h = classify('mcp__meta__ads_update_entity', { entity_id: '1', name: 'A' }).id;
+  const i = classify('mcp__meta__ads_update_entity', { entity_id: '1', name: 'B' }).id;
+  assert.notEqual(h, i, 'plain updates still bind to their fields');
+  assert.notEqual(classify('mcp__meta__ads_activate_entity', { entity_id: '1' }).id, classify('mcp__meta__ads_update_entity', { entity_id: '1', status: 'PAUSED' }).id, 'activate and pause of the same entity differ');
+});
+
+test('official server: payload arrives as a JSON string in `fields`; still classified, capped, and paused freely', () => {
+  const noise = { advertiser_job: 'update_existing_campaigns', advertiser_request: 'differs every call', client_conversation_id: 'abc', client_model: 'x' };
+  const pause = classify('mcp__meta-ads__ads_update_entity', { ad_account_id: '1389694561222174', entity_id: '120', entity_type: 'ad_set', fields: '{"status":"PAUSED"}', ...noise });
+  assert.equal(pause.kind, 'deescalate', 'the brake always works, even through a JSON string');
+  assert.equal(pause.account, 'act_1389694561222174');
+  const bud = classify('mcp__meta-ads__ads_update_entity', { ad_account_id: '1389694561222174', entity_id: '120', entity_type: 'ad_set', fields: '{"lifetime_budget":5000}', ...noise });
+  assert.equal(bud.kind, 'budget'); assert.deepEqual(bud.budgets, { lifetime: 5000 });
+  assert.equal(decide(bud, { ...P, max_lifetime_budget: 500, mode: 'twokey' }, fresh()).decision, 'deny');
+  assert.match(decide(bud, { ...P, max_lifetime_budget: 500, mode: 'twokey' }, fresh()).reason, /over the cap/);
+  const act = classify('mcp__meta-ads__ads_update_entity', { entity_id: '120', fields: '{"status":"ACTIVE"}' });
+  assert.equal(act.kind, 'activate');
+  const upd = classify('mcp__meta-ads__ads_update_entity', { ad_account_id: 'act_1', entity_id: '120', entity_type: 'ad_set', fields: '{"name":"new name"}', ...noise });
+  assert.equal(upd.kind, 'update');
+  assert.match(upd.summary, /^UPDATE ad set 120: name\.$/, 'summary names the real field, not the telemetry');
+  const upd2 = classify('mcp__meta-ads__ads_update_entity', { ad_account_id: 'act_1', entity_id: '120', fields: { name: 'new name' }, advertiser_request: 'other words' });
+  assert.equal(upd.id, upd2.id, 'string payload and object payload are the same change');
+  assert.equal(classify('mcp__meta-ads__ads_update_entity', { entity_id: '120', fields: '{"status":"DELETED"}' }).kind, 'delete');
+  assert.equal(classify('mcp__meta-ads__ads_update_entity', { entity_id: '120', fields: 'not json {' }).kind, 'update', 'a non-JSON string is left alone');
+});
+
+test('official server: publishing a drafted pause is allowed; publishing anything else is an activation', () => {
+  const d = fresh();
+  const pol = { ...P, mode: 'twokey' };
+  const pub = (ids) => classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: '1', entity_id: ids[0], entity_type: 'ad_set', object_ids: ids, publish_as_active: false });
+  assert.equal(pub(['120']).kind, 'publish');
+  assert.match(pub(['120']).summary, /PUBLISH pending drafts for ad set 120, keeping their drafted statuses/);
+  // Nothing drafted through handbrake yet: unknown drafts, treated as activation, denied in twokey.
+  let r = decide(pub(['120']), pol, d);
+  assert.equal(r.decision, 'deny'); assert.match(r.reason, /treated as an activation/);
+  // A pause was drafted through handbrake and succeeded (pre row with args, post row with eid).
+  const pause = classify('mcp__meta-ads__ads_update_entity', { ad_account_id: '1', entity_id: '120', entity_type: 'ad_set', fields: '{"status":"PAUSED"}' });
+  appendLedger(d, { session: 's', id: pause.id, kind: 'deescalate', decision: 'allow', args: JSON.stringify({ entity_id: '120', fields: '{"status":"PAUSED"}' }) });
+  appendLedger(d, { session: 's', id: pause.id, kind: 'deescalate', result: 'ok' });
+  r = decide(pub(['120']), pol, d);
+  assert.equal(r.decision, 'allow'); assert.match(r.reason, /publishes a pause\. Always allowed/);
+  // A later budget change on the same object makes the pending drafts unknown again.
+  appendLedger(d, { session: 's', id: 'hb-x', kind: 'budget', eid: '120', result: 'ok' });
+  assert.equal(decide(pub(['120']), pol, d).decision, 'deny');
+  // Two objects: both must be pauses.
+  appendLedger(d, { session: 's', id: 'hb-y', kind: 'deescalate', eid: '120', result: 'ok' });
+  appendLedger(d, { session: 's', id: 'hb-z', kind: 'deescalate', eid: '121', result: 'ok' });
+  assert.equal(decide(pub(['120', '121']), pol, d).decision, 'allow');
+  appendLedger(d, { session: 's', id: 'hb-w', kind: 'activate', eid: '121', result: 'ok' });
+  assert.equal(decide(pub(['120', '121']), pol, d).decision, 'deny');
+  // A delete the human approved publishes like a pause: it stops spend and was gated when drafted.
+  appendLedger(d, { session: 's', id: 'hb-v', kind: 'delete', eid: '121', result: 'ok' });
+  assert.equal(decide(pub(['120', '121']), pol, d).decision, 'allow');
+  // publish_as_active true is a plain activation, never a pause.
+  assert.equal(classify('mcp__meta-ads__ads_activate_entity', { entity_id: '120', publish_as_active: true }).kind, 'activate');
+  assert.equal(classify('mcp__meta-ads__ads_activate_entity', { entity_id: '120' }).kind, 'activate');
+  // statusLine does not count a pause-publish as live.
+  appendLedger(d, { session: 's2', id: 'hb-p', kind: 'publish', eid: '120', decision: 'allow', reason: 'handbrake: PUBLISH … publishes a pause. Always allowed.' });
+  appendLedger(d, { session: 's2', id: 'hb-p', kind: 'publish', eid: '120', result: 'ok' });
+  appendLedger(d, { session: 's2', id: 'hb-q', kind: 'publish', eid: '122', decision: 'allow', reason: 'handbrake: hb-q approved by the human.' });
+  appendLedger(d, { session: 's2', id: 'hb-q', kind: 'publish', eid: '122', result: 'ok' });
+  assert.match(statusLine(d, 's2'), /1 spend-affecting change went live/);
+  rmSync(d, { recursive: true, force: true });
+});
+
+test('a multi-object publish binds to exactly that set of ids', () => {
+  const two = classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_1', object_ids: ['222', '111'], publish_as_active: true });
+  assert.equal(two.kind, 'activate');
+  assert.equal(two.eid, '111+222');
+  assert.match(two.summary, /ACTIVATE 2 objects \(111, 222\): turns spend ON/);
+  const same = classify('mcp__meta-ads__ads_activate_entity', { object_ids: [111, 222], ad_account_id: 'act_1', advertiser_request: 'different every call' });
+  assert.equal(two.id, same.id, 'order and telemetry do not matter');
+  assert.notEqual(two.id, classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_1', object_ids: ['111'] }).id, 'subset is a different change');
+  assert.notEqual(two.id, classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_1', object_ids: ['111', '222', '333'] }).id, 'superset is a different change');
+  assert.notEqual(classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_1' }).id, two.id);
+  // Seen live: the official server call carried entity_id for the parent AND object_ids for the set.
+  const both = classify('mcp__meta-ads__ads_activate_entity', { ad_account_id: 'act_1', entity_id: '111', entity_type: 'campaign', object_ids: ['111', '222'], publish_as_active: true });
+  assert.equal(both.eid, '111+222');
+  assert.equal(both.id, two.id, 'the single id is already in the set; same change');
+  assert.match(both.summary, /ACTIVATE 2 objects/);
+});
+
 test('changeId is stable under key order and prefix, changes with any argument', () => {
   const a = changeId('mcp__meta__ads_update_entity', { entity_id: '1', daily_budget: 500 });
   const b = changeId('mcp__other__ads_update_entity', { daily_budget: 500, entity_id: '1' });
@@ -40,7 +135,7 @@ test('official MCP: reads pass, creates log, activate and budget gate, pause de-
   assert.equal(classify('mcp__meta-ads__ads_catalog_get_products', {}).kind, 'read');
   const cr = classify('mcp__meta-ads__ads_create_campaign', { name: 'Q4', objective: 'OUTCOME_SALES', daily_budget: 3000 });
   assert.equal(cr.kind, 'create');
-  assert.match(cr.summary, /CREATE campaign "Q4" with daily 30\.00 \(3000 minor units\)\. Starts PAUSED/);
+  assert.match(cr.summary, /CREATE campaign "Q4" with daily 30\.00 \(3000 minor units\)\. Created paused or as a draft/);
   assert.equal(classify('mcp__meta-ads__ads_create_ad', { adset_id: '1', status: 'ACTIVE' }).kind, 'activate', 'status ACTIVE on a create is an activation');
   const act = classify('mcp__meta-ads__ads_activate_entity', { entity_id: '120211', entity_type: 'ADSET' });
   assert.equal(act.kind, 'activate');
@@ -51,6 +146,7 @@ test('official MCP: reads pass, creates log, activate and budget gate, pause de-
   assert.equal(classify('mcp__meta-ads__ads_update_entity', { entity_id: '1', status: 'ACTIVE' }).kind, 'activate');
   assert.equal(classify('mcp__meta-ads__ads_update_entity', { entity_id: '1', status: 'PAUSED' }).kind, 'deescalate');
   assert.equal(classify('mcp__meta-ads__ads_update_entity', { entity_id: '1', name: 'renamed' }).kind, 'update');
+  assert.equal(classify('mcp__meta-ads__ads_update_entity', { entity_id: '1', status: 'DELETED' }).kind, 'delete', 'deleting via status is a delete, gated and named as such');
   assert.equal(classify('mcp__meta-ads__ads_update_entity', { entity_id: '1', updates: { lifetime_budget: '90000' } }).kind, 'budget', 'nested budget keys are found');
 });
 

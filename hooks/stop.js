@@ -12,7 +12,7 @@ const root = process.env.CLAUDE_PLUGIN_ROOT || resolve(here, '..');
 const lib = await import('file://' + join(root, 'skills', 'handbrake', 'scripts', 'handbrake.js').split('\\').join('/'));
 
 export const LIVE_CLAIM = /\b(is|are|now|went|gone|it's|they're)\s+live\b|\bactivated\b|\bturned (it |them |the \w+ )?on\b|\blaunched\b|\bbudget[^.\n]{0,30}\b(raised|increased|bumped|scaled|doubled|set to)\b|\bresumed\b|\b(spend|spending|delivery)\b[^.\n]{0,20}\b(started|running|on)\b|\bnow (running|spending|delivering)\b/i;
-export const EXEMPT = /\bnot (yet )?(live|activated|launched|resumed)\b|\bstill paused\b|\bremains? paused\b|\bwould (activate|launch|go live)\b|\bdid not (activate|launch|go live)\b|\bwas denied\b|\bno(thing)? went live\b/i;
+export const EXEMPT = /\bnot (yet )?(live|activated|launched|resumed)\b|\bstill paused\b|\bremains? paused\b|\bwould (activate|launch|go live)\b|\bdid not (activate|launch|go live)\b|\bwas denied\b|\bno(thing)? went live\b|\bactivated (nothing|none|no)\b|\bnothing (was |got )?activated\b|\bwithout activating\b|\bturned no spend on\b|\bno spend (was )?(turned on|started)\b/i;
 
 export function check(input) {
   const cwd = input.cwd || process.cwd();

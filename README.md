@@ -26,7 +26,7 @@ Then, once, in your own terminal from the project root:
 npx --yes --allow-git=all github:codegobrrrr9/handbrake init
 ```
 
-Under Claude Code that installs a plugin with three hooks. Works with Meta's official Ads MCP
+Under Claude Code that installs a plugin with four hooks. Works with Meta's official Ads MCP
 server (`mcp.facebook.com/ads`), the official `meta` CLI, and the community Meta Ads MCP servers.
 It classifies by the shape of the call, not by one server.
 
@@ -128,7 +128,7 @@ are in [drift-checks.md](skills/handbrake/references/drift-checks.md).
 |---|---|
 | `ads_get_*`, `ads_insights_*`, `ads_catalog_get_*`, any `get_ list_ search_ …` | pass, not logged |
 | `ads_update_entity` with `status: PAUSED`, `pause_*`, `meta ads … --status PAUSED` | allow, logged |
-| `ads_create_campaign / ad_set / ad`, `create_*`, `duplicate_*` | allow, logged (Meta starts them PAUSED) |
+| `ads_create_campaign / ad_set / ad`, `create_*`, `duplicate_*` | allow, logged (they land paused or as unpublished drafts) |
 | `ads_activate_entity`, `status: ACTIVE`, `resume_*`, `meta ads … activate` | **ask** or two-key |
 | `ads_update_entity` with `daily_budget / lifetime_budget / bid_amount`, `update_budget` | **ask** or two-key, denied over cap |
 | other updates, deletes, unknown verbs on an ads server, `curl -X POST graph.facebook.com/…` | **ask** or two-key |
@@ -150,6 +150,15 @@ handbrake policy [get | set <k> <v>]        caps (set is human only)
 handbrake audit <insights.json> [--previous <file>] [--json]
 ```
 
+## Tested live
+
+Run against a real ad account through Meta's official MCP server on 2026-10-12, in two-key mode:
+eleven probes, 16 gated calls, 8 denied, one approved activation of a zero-spend ad set, one pause and
+one delete published without a token, account spend 0.00. The run found and fixed four gaps, all
+recorded in [docs/live-test.md](docs/live-test.md): the official server creates drafts rather than
+paused objects, sends update payloads as JSON strings, needs a publish call to make a drafted pause
+real, and reports failed writes through a different hook event.
+
 ## What this is not
 
 It is not a scope. Pick the narrowest OAuth tier at consent (read-only, read/write,
@@ -163,8 +172,8 @@ it does not make the agent smarter about ads. It makes the agent unable to spend
 npm test
 ```
 
-Twenty-four tests, zero dependencies: classification of the official and community tool surfaces,
-caps, two-key issue and consume and expiry, the three hooks driven with real Claude Code hook
+Twenty-eight tests, zero dependencies: classification of the official and community tool surfaces,
+caps, two-key issue and consume and expiry, the four hooks driven with real Claude Code hook
 payloads, and the audit on a drifting fixture.
 
 ## License

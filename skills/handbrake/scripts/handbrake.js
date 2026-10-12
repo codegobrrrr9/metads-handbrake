@@ -65,6 +65,32 @@ export function canonical(v) {
 export function changeId(tool, args) {
   return 'hb-' + createHash('sha256').update(bareTool(tool) + '\n' + canonical(args ?? {})).digest('hex').slice(0, 10);
 }
+/** Scalars as strings, nulls and empties dropped: `true` and "true", 100 and "100" are the same change. */
+export function normalize(v) {
+  if (v === null || v === undefined || v === '') return undefined;
+  if (Array.isArray(v)) return v.map(normalize).filter((x) => x !== undefined);
+  if (typeof v === 'object') {
+    const o = {};
+    for (const k of Object.keys(v).sort()) { const n = normalize(v[k]); if (n !== undefined) o[k] = n; }
+    return o;
+  }
+  return String(v);
+}
+/**
+ * The approval id binds to the meaning of a change, not the byte layout of its arguments, so a fresh
+ * agent session that shapes the same call differently gets the same id. For activate, budget, pause
+ * and delete that is: kind + entity id + account + budgets + status. Updates and creates also carry
+ * their normalized arguments, since the fields themselves are the change.
+ */
+export function semanticId(kind, base, args) {
+  const sig = { kind, eid: base.eid || null, account: base.account || null, budgets: normalize(base.budgets) || {}, status: base.status || null };
+  if (['update', 'unknown-write', 'create'].includes(kind)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(expandJson(args) || {})) if (!NOISE_KEYS.has(k)) clean[k] = v;
+    sig.tool = base.bare; sig.args = normalize(clean) || {};
+  }
+  return 'hb-' + createHash('sha256').update(canonical(sig)).digest('hex').slice(0, 10);
+}
 
 // ---- classification --------------------------------------------------------------------------
 
@@ -91,7 +117,43 @@ const DELETE_VERB = /^(delete|remove|destroy)_?/i;
 const UPDATE_VERB = /^(ads_update|update|set|edit|modify|change|patch|adjust|scale|increase|decrease|bulk_update|batch_update)_?/i;
 
 const ID_KEYS = ['entity_id', 'id', 'campaign_id', 'adset_id', 'ad_set_id', 'ad_id', 'object_id', 'creative_id', 'node_id'];
+const ID_LIST_KEYS = ['object_ids', 'entity_ids', 'ids', 'campaign_ids', 'adset_ids', 'ad_set_ids', 'ad_ids'];
+/**
+ * Every id the call names, as one sorted set joined with '+'. A publish that carries entity_id plus an
+ * object_ids list binds to the whole set, so the summary says how many objects it touches and the
+ * approval cannot be reused for a different set.
+ */
+function entityIdOf(args) {
+  const set = new Set();
+  const one = firstVal(args, ID_KEYS);
+  if (one) set.add(one);
+  for (const k of ID_LIST_KEYS) {
+    for (const [, v] of deepFind(args, (kk, vv) => kk === k && Array.isArray(vv) && vv.length)) for (const x of v) set.add(String(x));
+  }
+  return set.size ? [...set].sort().join('+') : null;
+}
 const BUDGET_KEYS = { daily_budget: 'daily', lifetime_budget: 'lifetime', bid_amount: 'bid', dailyBudget: 'daily', lifetimeBudget: 'lifetime', bidAmount: 'bid', budget: 'daily' };
+
+/**
+ * Servers differ: the official Meta Ads MCP sends `fields: "{\"status\":\"PAUSED\"}"` as a JSON string;
+ * others send real objects. Expand any string that parses as a JSON object or array, recursively, so
+ * budgets, status and ids are found wherever they are. Never throws.
+ */
+export function expandJson(v, depth = 0) {
+  if (depth > 5) return v;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+      try { return expandJson(JSON.parse(t), depth + 1); } catch { return v; }
+    }
+    return v;
+  }
+  if (Array.isArray(v)) return v.map((x) => expandJson(x, depth + 1));
+  if (v && typeof v === 'object') { const o = {}; for (const [k, x] of Object.entries(v)) o[k] = expandJson(x, depth + 1); return o; }
+  return v;
+}
+/** Per-call telemetry the official server attaches; never part of the change. */
+const NOISE_KEYS = new Set(['advertiser_job', 'advertiser_request', 'client_conversation_id', 'client_model', 'entity_type', 'account_id', 'ad_account_id', 'publish_as_active']);
 
 export function deepFind(obj, pred, depth = 0, out = []) {
   if (!obj || typeof obj !== 'object' || depth > 5) return out;
@@ -142,13 +204,14 @@ const entityType = (tool, args) => {
 };
 
 /** classify(toolName, args, policy) -> { gated, kind, id, tool, bare, summary, budgets, account, entity, eid, status } */
-export function classify(toolName, args = {}, policy = DEFAULT_POLICY) {
+export function classify(toolName, rawArgs = {}, policy = DEFAULT_POLICY) {
+  const args = expandJson(rawArgs ?? {});
   const bare = bareTool(toolName), server = serverOf(toolName);
   const verbish = CREATE_VERB.test(bare) || UPDATE_VERB.test(bare) || ACTIVATE_VERB.test(bare) || DEESC_VERB.test(bare) || DELETE_VERB.test(bare);
   const ads = ADS_SERVER.test(server) || /^ads_/.test(bare) || (ADS_TOOL.test(bare) && verbish);
   const base = {
     tool: toolName, bare, server, id: changeId(toolName, args), budgets: budgetsOf(args), account: accountOf(args),
-    entity: entityType(toolName, args), eid: firstVal(args, ID_KEYS), status: statusOf(args),
+    entity: entityType(toolName, args), eid: entityIdOf(args), status: statusOf(args),
   };
   if (!ads) return { ...base, gated: false, kind: 'ignore', summary: '' };
   let kind;
@@ -162,21 +225,32 @@ export function classify(toolName, args = {}, policy = DEFAULT_POLICY) {
   if (kind === 'update' || kind === 'unknown-write') {
     if (base.status === 'ACTIVE') kind = 'activate';
     else if (base.status === 'PAUSED' || base.status === 'ARCHIVED') kind = 'deescalate';
+    else if (base.status === 'DELETED') kind = 'delete';
     else if (Object.keys(base.budgets).length) kind = 'budget';
   }
   if (kind === 'create' && base.status === 'ACTIVE') kind = 'activate';
+  // Official server: ads_activate_entity with publish_as_active=false publishes pending drafts keeping their
+  // drafted statuses. That is how a drafted pause reaches Meta, so it gets its own kind; decide() checks the ledger.
+  const paa = args && 'publish_as_active' in args ? String(args.publish_as_active).toLowerCase() : null;
+  if (kind === 'activate' && paa === 'false') kind = 'publish';
+  base.id = semanticId(kind, base, args);
   const unit = policy.budget_unit || 'minor';
   const bstr = Object.entries(base.budgets).map(([k, v]) => `${k} ${fmtMoney(v, unit)}`).join(', ');
-  const who = `${base.entity}${base.eid ? ' ' + base.eid : ''}`;
-  const name = firstVal(args, ['name']);
-  const changed = Object.keys(args || {}).filter((k) => !ID_KEYS.includes(k) && !['account_id', 'ad_account_id'].includes(k));
+  const multi = base.eid && base.eid.includes('+');
+  const who = multi ? `${base.eid.split('+').length} objects (${base.eid.split('+').join(', ')})` : `${base.entity}${base.eid ? ' ' + base.eid : ''}`;
+  const name = firstVal(args, ['name', 'campaign_name', 'adset_name', 'ad_set_name', 'ad_name']);
+  // The fields being changed: top-level keys, with a `fields`/`updates`/`params` wrapper unwrapped, minus ids and telemetry.
+  const wrapper = ['fields', 'updates', 'params', 'data', 'changes'].find((k) => args && args[k] && typeof args[k] === 'object');
+  const changed = Object.keys((wrapper ? { ...args, ...args[wrapper], [wrapper]: undefined } : args) || {})
+    .filter((k) => k !== wrapper && !ID_KEYS.includes(k) && !ID_LIST_KEYS.includes(k) && !NOISE_KEYS.has(k) && (wrapper ? args[wrapper][k] !== undefined || args[k] !== undefined : true));
   const summary = {
     read: '', ignore: '',
     deescalate: `PAUSE ${who}: stops or reduces spend. Always allowed.`,
     activate: `ACTIVATE ${who}: turns spend ON${bstr ? ' at ' + bstr : ''}.`,
+    publish: `PUBLISH pending drafts for ${who}, keeping their drafted statuses.`,
     budget: `BUDGET ${who}: ${bstr}.`,
     update: `UPDATE ${who}: ${changed.join(', ') || 'fields'}.`,
-    create: `CREATE ${base.entity}${name ? ` "${name}"` : ''}${bstr ? ' with ' + bstr : ''}. Starts PAUSED at Meta.`,
+    create: `CREATE ${base.entity}${name ? ` "${name}"` : ''}${bstr ? ' with ' + bstr : ''}. Created paused or as a draft; nothing runs until it is activated.`,
     delete: `DELETE ${who}. Not reversible.`,
     'unknown-write': `WRITE ${bare}${who !== 'entity' ? ' on ' + who : ''}: unrecognised verb, treated as a live change.`,
   }[kind];
@@ -217,7 +291,7 @@ export function classifyBash(command, policy = DEFAULT_POLICY) {
     activate: `ACTIVATE via CLI${bstr ? ' at ' + bstr : ''}: ${short}`,
     budget: `BUDGET via CLI: ${bstr}: ${short}`,
     update: `UPDATE via CLI: ${short}`,
-    create: `CREATE via CLI${bstr ? ' with ' + bstr : ''}: ${short}. Starts PAUSED at Meta.`,
+    create: `CREATE via CLI${bstr ? ' with ' + bstr : ''}: ${short}. Created paused or as a draft; nothing runs until it is activated.`,
     delete: `DELETE via CLI: ${short}. Not reversible.`,
   }[kind];
   return { gated: kind !== 'read', kind, id, bare: 'meta ads', tool: 'Bash', budgets, account: acct, summary };
@@ -244,11 +318,46 @@ export function revoke(cwd, id) {
   return false;
 }
 
+/**
+ * For each entity id, the kind of the latest write handbrake saw succeed. Ledger rows carry `eid`
+ * (older rows: recovered from the logged arguments).
+ */
+export function latestWriteKinds(cwd) {
+  const rows = readLedger(cwd);
+  const eidOf = new Map();
+  for (const r of rows) {
+    let e = r.eid;
+    if (!e && r.args) { try { e = entityIdOf(expandJson(JSON.parse(r.args))); } catch { e = null; } }
+    if (e && r.id) eidOf.set(r.id, e);
+  }
+  const latest = new Map();
+  for (const r of rows) {
+    if (r.result !== 'ok') continue;
+    const e = r.eid || eidOf.get(r.id);
+    if (!e) continue;
+    for (const one of e.split('+')) latest.set(one, r.kind);
+  }
+  return latest;
+}
+/**
+ * A publish is a de-escalation only if every object it names last had a pause, or a human-approved
+ * delete, drafted through handbrake. Both stop spend; the delete was already gated when drafted.
+ */
+export function publishIsPause(cls, cwd) {
+  if (!cls.eid) return false;
+  const latest = latestWriteKinds(cwd);
+  return cls.eid.split('+').every((id) => latest.get(id) === 'deescalate' || latest.get(id) === 'delete');
+}
+
 /** decide(cls, policy, cwd, {dry}) -> { decision: 'pass'|'allow'|'ask'|'deny', reason } */
 export function decide(cls, policy, cwd, opts = {}) {
   if (!cls.gated) return { decision: 'pass', reason: '' };
   if (cls.kind === 'self') return { decision: 'deny', reason: 'handbrake: ' + cls.summary };
   if (cls.kind === 'deescalate') return { decision: 'allow', reason: 'handbrake: ' + cls.summary };
+  if (cls.kind === 'publish') {
+    if (publishIsPause(cls, cwd)) return { decision: 'allow', reason: `handbrake: ${cls.summary} The only pending change handbrake let through for these objects is a PAUSE, so this publishes a pause. Always allowed.` };
+    cls = { ...cls, kind: 'activate', summary: cls.summary + ' Drafts may include changes handbrake did not see, so this is treated as an activation.' };
+  }
   const unit = policy.budget_unit || 'minor';
   if (policy.allowed_accounts?.length && cls.account && !policy.allowed_accounts.includes(cls.account)) {
     return { decision: 'deny', reason: `handbrake: account ${cls.account} is not in policy.allowed_accounts. The human edits .handbrake/policy.json to change that.` };
@@ -284,7 +393,8 @@ export function statusLine(cwd, session) {
   const n = (k) => rows.filter((r) => r.decision === k).length;
   const ok = rows.filter((r) => r.result === 'ok').length, err = rows.filter((r) => r.result === 'error').length;
   const p = loadPolicy(cwd);
-  const live = rows.filter((r) => r.result === 'ok' && ['activate', 'budget'].includes(r.kind)).length;
+  const pausePublish = new Set(rows.filter((r) => r.kind === 'publish' && r.decision === 'allow' && /publishes a pause/.test(r.reason || '')).map((r) => r.id));
+  const live = rows.filter((r) => r.result === 'ok' && (['activate', 'budget'].includes(r.kind) || (r.kind === 'publish' && !pausePublish.has(r.id)))).length;
   const gated = rows.filter((r) => r.decision && r.decision !== 'planned').length;
   return `handbrake: ${p.mode}${p._missing ? ' (defaults; run handbrake init)' : ''} · ${gated} gated call${gated === 1 ? '' : 's'} · ${n('allow') + n('ask')} passed, ${n('deny')} denied · ${ok} succeeded, ${err} failed · ${live} spend-affecting change${live === 1 ? '' : 's'} went live`;
 }

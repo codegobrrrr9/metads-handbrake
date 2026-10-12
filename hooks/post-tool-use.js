@@ -27,12 +27,15 @@ export function handle(input) {
   const policy = lib.loadPolicy(cwd);
   const cls = tool === 'Bash' ? lib.classifyBash(args.command, policy) : tool.startsWith('mcp__') ? lib.classify(tool, args, policy) : null;
   if (!cls || !cls.gated || cls.kind === 'self') return null;
-  const o = outcome(input.tool_response);
-  lib.appendLedger(cwd, { session: input.session_id || '', id: cls.id, tool, kind: cls.kind, summary: cls.summary, result: o.result, detail: o.detail, ids: o.ids });
-  const live = o.result === 'ok' && ['activate', 'budget'].includes(cls.kind);
+  // PostToolUseFailure delivers the error in `error` (no tool_response); PostToolUse delivers tool_response.
+  const failed = input.hook_event_name === 'PostToolUseFailure' || (input.error != null && input.tool_response == null);
+  const o = failed ? { result: 'error', ids: [], detail: String(typeof input.error === 'string' ? input.error : JSON.stringify(input.error ?? 'tool failed')).replace(/\s+/g, ' ').slice(0, 240) } : outcome(input.tool_response);
+  // Decide "live" before appending this row, or the publish would see itself as the latest write.
+  const live = o.result === 'ok' && (['activate', 'budget'].includes(cls.kind) || (cls.kind === 'publish' && !lib.publishIsPause(cls, cwd)));
+  lib.appendLedger(cwd, { session: input.session_id || '', id: cls.id, tool, kind: cls.kind, eid: cls.eid || null, summary: cls.summary, result: o.result, detail: o.detail, ids: o.ids });
   return {
     hookSpecificOutput: {
-      hookEventName: 'PostToolUse',
+      hookEventName: failed ? 'PostToolUseFailure' : 'PostToolUse',
       additionalContext: `handbrake ${cls.id}: ${o.result}${live ? ' and LIVE: spend is now affected' : ''}. ${o.detail}`.trim(),
     },
   };

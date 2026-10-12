@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { readLedger, approve, savePolicy, DEFAULT_POLICY, changeId } from '../skills/handbrake/scripts/handbrake.js';
+import { readLedger, approve, savePolicy, DEFAULT_POLICY, classify } from '../skills/handbrake/scripts/handbrake.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const HOOKS = join(here, '..', 'hooks');
@@ -50,7 +50,8 @@ test('pre: pause allowed, create allowed+logged, over-cap budget denied', () => 
   const d = fresh();
   assert.equal(decision(pre({ tool_name: 'mcp__meta-ads__ads_update_entity', tool_input: { entity_id: '1', status: 'PAUSED' } }, d)), 'allow');
   const cr = pre({ tool_name: 'mcp__meta-ads__ads_create_campaign', tool_input: { name: 'Q4', daily_budget: 3000 } }, d);
-  assert.equal(decision(cr), 'allow'); assert.match(cr.out.hookSpecificOutput.permissionDecisionReason, /Starts PAUSED at Meta\. Logged/);
+  assert.equal(decision(cr), 'allow'); assert.match(cr.out.hookSpecificOutput.permissionDecisionReason, /nothing runs until it is activated\. Logged/);
+  assert.match(readLedger(d)[1].args, /"name":"Q4"/, 'arguments are kept for diagnosis');
   const over = pre({ tool_name: 'mcp__meta-ads__ads_update_entity', tool_input: { entity_id: '1', daily_budget: 999999 } }, d);
   assert.equal(decision(over), 'deny'); assert.match(over.out.hookSpecificOutput.permissionDecisionReason, /over the cap/);
   assert.equal(readLedger(d).length, 3);
@@ -76,8 +77,10 @@ test('pre: twokey denies without a token and allows exactly once with one', () =
   const input = { tool_name: 'mcp__meta-ads__ads_update_entity', tool_input: { entity_id: '1', daily_budget: 5000 } };
   const no = pre(input, d);
   assert.equal(decision(no), 'deny'); assert.match(no.out.hookSpecificOutput.permissionDecisionReason, /in THEIR terminal/);
-  approve(d, changeId(input.tool_name, input.tool_input), 30, 'yes');
-  const yes = pre(input, d);
+  approve(d, classify(input.tool_name, input.tool_input).id, 30, 'yes');
+  // A fresh session shapes the same change differently: string budget, extra null, different key order.
+  const reshaped = { tool_name: 'mcp__meta-ads__ads_update_entity', tool_input: { daily_budget: '5000', entity_id: '1', entity_type: null } };
+  const yes = pre(reshaped, d);
   assert.equal(decision(yes), 'allow'); assert.match(yes.out.hookSpecificOutput.permissionDecisionReason, /approved by the human \(yes\)/);
   assert.equal(decision(pre(input, d)), 'deny', 'token consumed');
   rmSync(d, { recursive: true, force: true });
@@ -105,9 +108,12 @@ test('post: records ok with ids, records errors, ignores reads', () => {
   assert.equal(post({ tool_name: 'Bash', tool_input: { command: 'npm test' }, tool_response: { stdout: 'error: 1 failed' } }, d).out, null);
   const cli = post({ tool_name: 'Bash', tool_input: { command: 'meta ads adset update 1 --daily-budget 5000' }, tool_response: { stdout: '', stderr: 'API error', exit_code: 4 } }, d);
   assert.match(cli.out.hookSpecificOutput.additionalContext, /: error/);
+  const fail = post({ ...base, hook_event_name: 'PostToolUseFailure', error: 'VALIDATION (code 100, subcode 2490409): Missing dependency: You must first publish the ad objects [120250187538830232]' }, d);
+  assert.match(fail.out.hookSpecificOutput.additionalContext, /: error\. VALIDATION \(code 100/);
+  assert.equal(fail.out.hookSpecificOutput.hookEventName, 'PostToolUseFailure');
   const L = readLedger(d);
-  assert.equal(L.length, 4);
-  assert.deepEqual(L.map((r) => r.result), ['ok', 'error', 'error', 'error']);
+  assert.equal(L.length, 5);
+  assert.deepEqual(L.map((r) => r.result), ['ok', 'error', 'error', 'error', 'error']);
   assert.deepEqual(L[0].ids, ['120211000111']);
   rmSync(d, { recursive: true, force: true });
 });

@@ -20,7 +20,7 @@ Your job is judgment and proposals. Spend is the human's decision, one change at
    they help. Nothing is logged.
 2. **Pausing is always allowed.** Any change that stops or reduces spend goes through at once and is
    logged. If something is bleeding, pause it first and explain second.
-3. **Create freely, PAUSED.** Meta creates campaigns, ad sets and ads paused. Build the whole
+3. **Create freely, PAUSED or as drafts.** Community servers create paused objects; the official server creates unpublished drafts that only an activate call publishes. Build the whole
    structure, then propose activation. Never pass `status: ACTIVE` on a create.
 4. **Activation and budget changes stop at the human.** Under Claude Code the hook does this for
    you: in `ask` mode a prompt shows the change in plain words; in `twokey` mode the call is denied
