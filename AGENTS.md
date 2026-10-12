@@ -2,7 +2,7 @@
 
 You are reading this because a user pasted something like:
 
-> Install the handbrake skill from https://github.com/codegobrrrr9/handbrake, refer to the repo's AGENTS.md.
+> Install the handbrake skill from https://github.com/codegobrrrr9/metads-handbrake, refer to the repo's AGENTS.md.
 
 Do the install for the agent you are, confirm in one line, then follow the rules below for the rest
 of the session. Do not explain what handbrake is unless asked.
@@ -10,14 +10,14 @@ of the session. Do not explain what handbrake is unless asked.
 ## Install
 
 `<repo>` is a clone of this repository, or the raw files fetched from
-`https://raw.githubusercontent.com/codegobrrrr9/handbrake/main/`.
+`https://raw.githubusercontent.com/codegobrrrr9/metads-handbrake/main/`.
 
 | Agent | Do this |
 |-------|---------|
-| Claude Code | Run `/plugin marketplace add codegobrrrr9/handbrake` then `/plugin install handbrake@handbrake`. The plugin ships four hooks: Meta ads reads pass, pauses pass, creates are logged, activations and budget changes stop at a permission prompt (or need a two-key token), and a final message that says "live" without a successful write in the ledger is sent back. If plugins are unavailable, copy `<repo>/skills/handbrake/` to `~/.claude/skills/handbrake/` and add the hooks block below to `~/.claude/settings.json`. |
-| Codex | Copy `<repo>/skills/handbrake/` to `~/.codex/skills/handbrake/`, or run `npx skills add codegobrrrr9/handbrake`. Append the **Rules** below to the project's `AGENTS.md`. Before any write, run `node <path>/handbrake.js explain <tool> '<json>'` and show the human the summary. |
+| Claude Code | Run `/plugin marketplace add codegobrrrr9/metads-handbrake` then `/plugin install handbrake@metads-handbrake`. The plugin ships four hooks: Meta ads reads pass, pauses pass, creates are logged, activations and budget changes stop at a permission prompt (or need a two-key token), and a final message that says "live" without a successful write in the ledger is sent back. If plugins are unavailable, copy `<repo>/skills/handbrake/` to `~/.claude/skills/handbrake/` and add the hooks block below to `~/.claude/settings.json`. |
+| Codex | Copy `<repo>/skills/handbrake/` to `~/.codex/skills/handbrake/`, or run `npx skills add codegobrrrr9/metads-handbrake`. Append the **Rules** below to the project's `AGENTS.md`. Before any write, run `node <path>/handbrake.js explain <tool> '<json>'` and show the human the summary. |
 | Cursor | Copy `<repo>/.cursor/rules/handbrake.mdc` to `.cursor/rules/handbrake.mdc` and `<repo>/skills/handbrake/scripts/handbrake.js` to `scripts/handbrake.js` in the project. |
-| Gemini CLI | Run `gemini extensions install https://github.com/codegobrrrr9/handbrake`. |
+| Gemini CLI | Run `gemini extensions install https://github.com/codegobrrrr9/metads-handbrake`. |
 | GitHub Copilot | Copy `<repo>/.github/copilot-instructions.md` into the project's `.github/` (merge if one exists). |
 | Anything else | Append the **Rules** below to the instruction file the agent reads, keep `handbrake.js` in the project, and run `explain` before every write. |
 

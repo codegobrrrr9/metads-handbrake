@@ -1,6 +1,6 @@
 # handbrake
 
-Rules from https://github.com/codegobrrrr9/handbrake. The agent can drive the Meta ads account; spend does not move until the human releases the brake.
+Rules from https://github.com/codegobrrrr9/metads-handbrake. The agent can drive the Meta ads account; spend does not move until the human releases the brake.
 
 1. Reads are free. Pausing is always allowed. Creates are fine because they land paused or as unpublished drafts; never pass `status: ACTIVE` on a create.
 2. Before any activation, budget or status change, run `node scripts/handbrake.js explain <tool> '<json>'` (copy `skills/handbrake/scripts/handbrake.js` from the repo to `scripts/handbrake.js`) and show the human the one-line summary. Do not call the write until they say yes to that exact change.

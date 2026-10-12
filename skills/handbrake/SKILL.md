@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: codegobrrrr9
   version: "0.1.0"
-  homepage: https://github.com/codegobrrrr9/handbrake
+  homepage: https://github.com/codegobrrrr9/metads-handbrake
 ---
 
 # handbrake

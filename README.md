@@ -6,7 +6,7 @@
 
 Reads pass. Pauses pass. Creates are logged. Activations and budget changes stop at you, in plain words. Everything lands in a ledger, and a final message that says "live" without a successful write gets sent back.
 
-[![test](https://github.com/codegobrrrr9/handbrake/actions/workflows/test.yml/badge.svg)](https://github.com/codegobrrrr9/handbrake/actions/workflows/test.yml)
+[![test](https://github.com/codegobrrrr9/metads-handbrake/actions/workflows/test.yml/badge.svg)](https://github.com/codegobrrrr9/metads-handbrake/actions/workflows/test.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![zero deps](https://img.shields.io/badge/dependencies-0-brightgreen)
 
@@ -17,13 +17,13 @@ Reads pass. Pauses pass. Creates are logged. Activations and budget changes stop
 Paste this into your coding agent:
 
 ```
-Install the handbrake skill from https://github.com/codegobrrrr9/handbrake, refer to the repo's AGENTS.md.
+Install the handbrake skill from https://github.com/codegobrrrr9/metads-handbrake, refer to the repo's AGENTS.md.
 ```
 
 Then, once, in your own terminal from the project root:
 
 ```bash
-npx --yes --allow-git=all github:codegobrrrr9/handbrake init
+npx --yes --allow-git=all github:codegobrrrr9/metads-handbrake init
 ```
 
 Under Claude Code that installs a plugin with four hooks. Works with Meta's official Ads MCP

@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "Approval-gated Meta ads agent. Reads and pauses pass, creates are logged, activations and budget changes stop at you, everything in a ledger.",
   "author": { "name": "codegobrrrr9", "url": "https://github.com/codegobrrrr9" },
-  "homepage": "https://github.com/codegobrrrr9/handbrake",
-  "repository": "https://github.com/codegobrrrr9/handbrake",
+  "homepage": "https://github.com/codegobrrrr9/metads-handbrake",
+  "repository": "https://github.com/codegobrrrr9/metads-handbrake",
   "license": "MIT",
   "keywords": ["meta-ads", "facebook-ads", "mcp", "approval", "human-in-the-loop", "hooks", "claude-code"]
 }
