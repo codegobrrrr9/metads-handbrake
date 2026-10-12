@@ -13,7 +13,8 @@ export function outcome(resp) {
   const head = str.slice(0, 1200);
   const isErr = !!(resp && typeof resp === 'object' && (resp.isError || resp.is_error))
     || (resp && typeof resp === 'object' && typeof resp.exit_code === 'number' && resp.exit_code !== 0)
-    || /"error"\s*:\s*[{"]|OAuthException|\(#\d{2,4}\)|Error validating|Invalid parameter|Permissions error|Unsupported (post|get) request/i.test(head);
+    // Meta can answer success:true and still carry an error block (seen live: a drafted pause on a deleted ad set).
+    || /\\?"error\\?"\s*:\s*[{"\\]|\\?"errors\\?"\s*:\s*\[\s*[{"\\]|\\?"error_(type|code|summary|description|user_msg)\\?"\s*:\s*\\?["\d{[]|OAuthException|\(#\d{2,4}\)|Error validating|Invalid parameter|Permissions error|Unsupported (post|get) request/i.test(head);
   // MCP responses wrap JSON in a text string, so quotes may be escaped: \"id\":\"123\"
   const ids = [...new Set([...str.matchAll(/\\?"(?:id|campaign_id|adset_id|ad_id)\\?"\s*:\s*\\?"?(\d{6,})/g)].map((m) => m[1]))].slice(0, 5);
   const detail = isErr ? head.replace(/\s+/g, ' ').slice(0, 240) : (ids.length ? 'ids ' + ids.join(', ') : head.replace(/\s+/g, ' ').slice(0, 120));

@@ -108,12 +108,18 @@ test('post: records ok with ids, records errors, ignores reads', () => {
   assert.equal(post({ tool_name: 'Bash', tool_input: { command: 'npm test' }, tool_response: { stdout: 'error: 1 failed' } }, d).out, null);
   const cli = post({ tool_name: 'Bash', tool_input: { command: 'meta ads adset update 1 --daily-budget 5000' }, tool_response: { stdout: '', stderr: 'API error', exit_code: 4 } }, d);
   assert.match(cli.out.hookSpecificOutput.additionalContext, /: error/);
+  // Seen live: success:true with an embedded error block. That is an error, not an ok.
+  const soft = post({ tool_name: 'mcp__meta-ads__ads_update_entity', tool_input: { entity_id: '1', fields: '{"status":"PAUSED"}' }, tool_response: { content: [{ type: 'text', text: '{"success":true,"is_draft":true,"error_type":"AD_DRAFT_PUBLISHING","error_summary":"Deleted ad set can\'t be edited","error_code":3858862}' }] } }, d);
+  assert.match(soft.out.hookSpecificOutput.additionalContext, /: error\./);
+  assert.doesNotMatch(soft.out.hookSpecificOutput.additionalContext, /LIVE/);
+  const okText = post({ tool_name: 'mcp__meta-ads__ads_update_entity', tool_input: { entity_id: '1', fields: '{"status":"PAUSED"}' }, tool_response: { content: [{ type: 'text', text: '{"success":true,"is_draft":true,"error_type":null,"id":"1"}' }] } }, d);
+  assert.match(okText.out.hookSpecificOutput.additionalContext, /: ok/, 'a null error_type is not an error');
   const fail = post({ ...base, hook_event_name: 'PostToolUseFailure', error: 'VALIDATION (code 100, subcode 2490409): Missing dependency: You must first publish the ad objects [120250187538830232]' }, d);
   assert.match(fail.out.hookSpecificOutput.additionalContext, /: error\. VALIDATION \(code 100/);
   assert.equal(fail.out.hookSpecificOutput.hookEventName, 'PostToolUseFailure');
   const L = readLedger(d);
-  assert.equal(L.length, 5);
-  assert.deepEqual(L.map((r) => r.result), ['ok', 'error', 'error', 'error', 'error']);
+  assert.equal(L.length, 7);
+  assert.deepEqual(L.map((r) => r.result), ['ok', 'error', 'error', 'error', 'error', 'ok', 'error']);
   assert.deepEqual(L[0].ids, ['120211000111']);
   rmSync(d, { recursive: true, force: true });
 });

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#0b0f14"/>
+  <text x="80" y="105" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="36" fill="#c9d4e0" font-weight="bold">The agent asked to turn spend on. This is what the human saw.</text>
+  <text x="80" y="152" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="22" fill="#7f8c9a">Claude Code permission prompt, written by the handbrake hook. Real session, real ad account, 12 Oct 2026.</text>
+
+  <rect x="80" y="200" width="1440" height="150" rx="10" fill="#121923" stroke="#263241"/>
+  <text x="110" y="248" font-family="Consolas, Menlo, monospace" font-size="24" fill="#e6c07b">handbrake hb-005453a161:</text>
+  <text x="110" y="290" font-family="Consolas, Menlo, monospace" font-size="24" fill="#e8eef4">ACTIVATE 2 objects (120250187538830232, 120250187539250232): turns spend ON.</text>
+  <text x="110" y="328" font-family="Consolas, Menlo, monospace" font-size="22" fill="#7f8c9a">[Allow]  [Deny]</text>
+
+  <text x="80" y="420" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#c9d4e0" font-weight="bold">The ledger for the whole test run</text>
+
+  <g font-family="Consolas, Menlo, monospace" font-size="21">
+    <text x="80" y="470" fill="#7f8c9a">01:29:22  hb-760a86758f  </text><text x="420" y="470" fill="#8fd18f">allow </text><text x="520" y="470" fill="#c9d4e0">create      CREATE campaign. Draft; nothing runs until activated.</text>
+    <text x="80" y="505" fill="#7f8c9a">01:29:29  hb-f065cb28cc  </text><text x="420" y="505" fill="#8fd18f">allow </text><text x="520" y="505" fill="#c9d4e0">create      CREATE ad set with lifetime 1.00 (100 minor units).</text>
+    <text x="80" y="540" fill="#7f8c9a">01:30:51  hb-38f2b7dea0  </text><text x="420" y="540" fill="#e07070">deny  </text><text x="520" y="540" fill="#c9d4e0">activate    ACTIVATE ad set: policy.block_activate is on.</text>
+    <text x="80" y="575" fill="#7f8c9a">01:31:56  hb-d32cf737a0  </text><text x="420" y="575" fill="#e07070">deny  </text><text x="520" y="575" fill="#c9d4e0">activate    ACTIVATE ad set: no approval token. Ask the human.</text>
+    <text x="80" y="610" fill="#7f8c9a">02:27:17  hb-005453a161  </text><text x="420" y="610" fill="#8fd18f">allow </text><text x="520" y="610" fill="#c9d4e0">activate    ACTIVATE 2 objects: approved by the human.</text>
+    <text x="80" y="645" fill="#7f8c9a">02:27:18  hb-005453a161  </text><text x="420" y="645" fill="#8fd18f">ok    </text><text x="520" y="645" fill="#c9d4e0">activate    published. Ad set ACTIVE, 0 ads, starts in 48 h.</text>
+    <text x="80" y="680" fill="#7f8c9a">02:31:34  hb-e972202529  </text><text x="420" y="680" fill="#e07070">deny  </text><text x="520" y="680" fill="#c9d4e0">budget      BUDGET lifetime 50.00: over the cap 5.00.</text>
+    <text x="80" y="715" fill="#7f8c9a">02:31:39  hb-6011faf422  </text><text x="420" y="715" fill="#8fd18f">allow </text><text x="520" y="715" fill="#c9d4e0">deescalate  PAUSE ad set: stops spend. Always allowed.</text>
+    <text x="80" y="750" fill="#7f8c9a">02:42:36  hb-cf89af6ffd  </text><text x="420" y="750" fill="#8fd18f">allow </text><text x="520" y="750" fill="#c9d4e0">delete      DELETE campaign: approved by the human.</text>
+  </g>
+
+  <rect x="80" y="790" width="1440" height="60" rx="8" fill="#121923" stroke="#263241"/>
+  <text x="110" y="829" font-family="Consolas, Menlo, monospace" font-size="20" fill="#e8eef4">handbrake: twokey · 16 gated calls · 8 passed, 8 denied · 7 succeeded, 0 failed · 1 change went live · account spend 0.00</text>
+</svg>

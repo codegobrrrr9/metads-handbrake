@@ -126,7 +126,19 @@ Also learned: the official tools carry per-call telemetry fields that differ eve
 the fingerprint and the summaries); `ad_account_id` arrives without the `act_` prefix; a plain lookup
 by id does not find drafts.
 
-## 6. Second pass, later
+## 6. Second pass, `ask` mode (2026-10-12)
 
-Repeat probes 3 to 9 in `ask` mode under default permissions. The gate becomes Claude Code's own
-prompt with the one-line summary. Same expected outcomes, less typing.
+Run headless, so nobody could answer the prompt: Claude Code turns the hook's `ask` into an automatic
+denial that carries the hook's reason. That proves the gate reaches the prompt layer; the prompt
+itself needs an interactive session. To keep the account untouched, every call targeted the ad set
+already deleted in probe 11.
+
+| Call | Result |
+|---|---|
+| activate (publish_as_active true) | `ask` emitted, harness denied, reason text was the handbrake line |
+| lifetime budget 100 (under cap) | `ask` emitted, harness denied |
+| lifetime budget 5000 (over cap) | `deny` by the cap, never a prompt |
+| pause | allowed; Meta answered `success: true` **with** an embedded `error_type: AD_DRAFT_PUBLISHING` ("Deleted ad set can't be edited"). The hook logged it as ok. **Fix:** a success that carries an `error`, `errors` or `error_*` block with a value is an error |
+
+Still to do by hand, once: open an interactive session in the test folder with `mode: ask`, ask the
+agent to activate something, and confirm the permission dialog shows the one-line summary.
